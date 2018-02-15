@@ -199,7 +199,7 @@ class Robot(GeomContainer):
                 dist_sensor.set_color(0, 0, 0)
             else:
                 dist_sensor.set_color(1, 0, 0)
-            dist_sensor.set_pos((rotate([30, 0], 360 / 20 * i, deg=True)))
+            dist_sensor.set_pos(*(rotate([30, 0], 360 / 20 * i, deg=True)))
             dist_sensor.set_angle(360 / 20 * i, deg=True)
             dist_sensor.add_attr(self.trans)
             self.sensors.append(dist_sensor)
