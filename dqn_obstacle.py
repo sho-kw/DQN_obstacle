@@ -9,8 +9,6 @@ from gym import Env
 from gym.envs.classic_control import rendering
 from gym import spaces
 
-from time import sleep
-
 from kdrl.agent import DQNAgent
 from kdrl.policy import *
 from kdrl.memory import *
@@ -27,7 +25,7 @@ param2 = int(sys.argv[2])#hidden2
 param3 = int(sys.argv[3])#num_action
 param4 = float(sys.argv[4])#broken_sensor
 param5 = int(sys.argv[5])#memory
-param6 = int(sys.argv[6])#episode
+param6 = int(sys.argv[6])#episodes
 param7 = int(sys.argv[7])#num_obstacles
 param8 = int(sys.argv[8])#pos_obstacles
 param_name = str(sys.argv[9])#filename
@@ -323,7 +321,7 @@ class ObstacleEnv(Env):
             #self.state[4:_NUM_DISTANCE_SENSOR + 3] = self.robot.get_sensor_values()[1:20]
             #self.state[_NUM_DISTANCE_SENSOR + 1:_NUM_DISTANCE_SENSOR + 3] = np.ones(2, dtype=np.float32)
             broken = randint(1, 4)
-            if self.count_step % 2 == 1:
+            if broken % 2 == 1:
                 self.state[3:_NUM_DISTANCE_SENSOR + 3] = self.robot.get_sensor_values()
             else:
                 self.state[3:_NUM_DISTANCE_SENSOR + 3] = np.ones(_NUM_DISTANCE_SENSOR, dtype=np.float32)
@@ -396,16 +394,14 @@ def main():
             else:
                 agent.end_episode(state, reward)
                 break
-    ###print_graph
+
+    ###print_graph###
         if reward >= 100:
             goal.append(1.0)
-            #print("o")   
         else:
             goal.append(0.0)
-            #print("x")
         if episode % 1000 == 0:
-                print("episode: {}/{}, score: {}"
-                        .format(episode, episodes, reward_sum))
+                print("episode: {}/{}, score: {}".format(episode, episodes, reward_sum))
     n = 100
     v = np.ones(n, dtype="float32")/n
     goal_sma = np.convolve(goal, v, mode='valid')
@@ -415,10 +411,11 @@ def main():
     plt.grid()
     plt.plot(epi, goal_sma)
     #plt.legend()
-    filename = "graph_{param}.png".format(param=param_name)
+    dir_name = "/home/shohei/ドキュメント/DQN_obstacle_Data/" ###保存場所の指定###
+    filename = "{directory}{param}.png".format(directory=dir_name,param=param_name)
     plt.savefig(filename)
     ###
-    csvname = "csvtrane_{param}.csv".format(param=param_name)
+    csvname = "{directory}{param}.csv".format(directory=dir_name,param=param_name)
     csv = np.c_[np.arange(param6),goal]
     np.savetxt(csvname,csv,delimiter=',')
 
