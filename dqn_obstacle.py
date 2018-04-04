@@ -4,6 +4,7 @@ import re
 import math
 import matplotlib.pyplot as plt
 import sys
+import random
 from numpy.random import randint
 from gym import Env
 from gym.envs.classic_control import rendering
@@ -20,9 +21,12 @@ import gym
 _NUM_DISTANCE_SENSOR = 20
 _DISTANCE_SENSOR_MAX_DISTANCE = 200
 
+_start_line = 100
+_goal_line = 600
+
 param1 = int(sys.argv[1])#hidden1
 param2 = int(sys.argv[2])#hidden2
-param3 = int(sys.argv[3])#num_action
+param3 = int(sys.argv[3])#batch_size
 param4 = float(sys.argv[4])#broken_sensor
 param5 = int(sys.argv[5])#memory
 param6 = int(sys.argv[6])#episodes
@@ -277,11 +281,11 @@ class ObstacleEnv(Env):
         #
 
         done = (min(self.state[3:_NUM_DISTANCE_SENSOR + 3]) <= 0.02) \
-            or (self.robot.pos[0] > 600)
+            or (self.robot.pos[0] > _goal_line)
 
         if min(self.state[3:_NUM_DISTANCE_SENSOR + 3]) <= 0.02:
             reward = -1000
-        elif self.robot.pos[0] > 600:
+        elif self.robot.pos[0] > _goal_line:
             reward = 1000
         else:
             rew =0
@@ -294,7 +298,7 @@ class ObstacleEnv(Env):
 
     def _reset(self):
         self.count_step = 0
-        self.robot.set_pos(100, self.screen_height/2)
+        self.robot.set_pos(_start_line, self.screen_height/2)
         self.robot.set_angle(0)
         if param8 == 0:
             self.obstacles[0].set_pos(200, self.screen_height/2 + 100)
@@ -306,7 +310,7 @@ class ObstacleEnv(Env):
                 obs.set_angle(0)        
         else:    
             for obs in self.obstacles:
-                obs.set_pos(randint(200, 600), randint(0, self.screen_height))
+                obs.set_pos(randint(_start_line + 100, _goal_line), randint(0, self.screen_height))
                 obs.set_angle(0)
         self.update_state()
         return self.state
@@ -316,17 +320,15 @@ class ObstacleEnv(Env):
         self.state[0:2] = self.robot.pos.tolist()
         self.state[2:3] =np.array(self.robot.angle, dtype="float32")
         ###broken_sensor###
-        if param4 == 1:
-            #self.state[3:4] = 1
-            #self.state[4:_NUM_DISTANCE_SENSOR + 3] = self.robot.get_sensor_values()[1:20]
-            #self.state[_NUM_DISTANCE_SENSOR + 1:_NUM_DISTANCE_SENSOR + 3] = np.ones(2, dtype=np.float32)
-            broken = randint(1, 4)
-            if broken % 2 == 1:
-                self.state[3:_NUM_DISTANCE_SENSOR + 3] = self.robot.get_sensor_values()
-            else:
-                self.state[3:_NUM_DISTANCE_SENSOR + 3] = np.ones(_NUM_DISTANCE_SENSOR, dtype=np.float32)
-        
-        else:
+        if param4 == 1:#前方3つ故障
+            self.state[3:4] = 1
+            self.state[4:_NUM_DISTANCE_SENSOR + 1] = self.robot.get_sensor_values()[1:18]
+            self.state[_NUM_DISTANCE_SENSOR + 1:_NUM_DISTANCE_SENSOR + 3] = np.ones(2, dtype=np.float32)
+        elif param4 == 2:#ノイズ0.9〜1.1
+            broken = random.uniform(0.9, 1.1)
+            for brk in range(20):
+                self.state[3+brk:4+brk] = self.robot.get_sensor_values()[brk]　*　broken
+        else:#故障なし
             self.state[3:_NUM_DISTANCE_SENSOR + 3] = self.robot.get_sensor_values()
         
     def register_visible_object(self, geom_container):
@@ -339,10 +341,10 @@ class ObstacleEnv(Env):
             return
         if self.viewer is None:
             self.viewer = rendering.Viewer(self.screen_width, self.screen_height)
-            self.st = rendering.Line((100,0), (100,self.screen_height))
+            self.st = rendering.Line((_start_line,0), (_start_line,self.screen_height))
             self.st.set_color(0,0,0)
             self.viewer.add_geom(self.st)            
-            self.goal = rendering.Line((600,0), (600,self.screen_height))
+            self.goal = rendering.Line((_goal_line,0), (_goal_line,self.screen_height))
             self.goal.set_color(0,0,0)
             self.viewer.add_geom(self.goal)
             #
@@ -354,7 +356,7 @@ class ObstacleEnv(Env):
 def get_model(state_shape, num_actions):
     return Sequential([InputLayer(input_shape=state_shape),
                        Dense(param1, activation='relu'),
-                       Dense(param2, activation='relu'),          
+                       Dense(param2, activation='relu'),        
                        Dense(num_actions)])
 
 def main():
@@ -368,13 +370,14 @@ def main():
     env = gym.make('Obstacle-v0')
     #
     state_shape = (_NUM_DISTANCE_SENSOR + 3,)
-    num_actions = param3
+    num_actions = 5
 
     agent = DQNAgent(core_model=get_model(state_shape, num_actions),
                      num_actions=num_actions,
                      optimizer='adam',
                      policy=Boltzmann(),
                      memory=param5,
+                     batch_size=param3
                      )
     # training
     goal = []
@@ -421,7 +424,7 @@ def main():
 
     # test
     goal = []
-    for episode in range(5):
+    for episode in range(5000):
         state = env.reset()
         reward_sum = 0
         while True:
@@ -431,7 +434,30 @@ def main():
             reward_sum += reward
             if done:
                 break
-        print('episode {} score: {}'.format(episode, reward_sum))
+    ###print_graph###
+        if reward >= 100:
+            goal.append(1.0)
+        else:
+            goal.append(0.0)
+        if episode % 1000 == 0:
+                print("episode: {}/{}, score: {}".format(episode, episodes, reward_sum))
+    n = 100
+    v = np.ones(n, dtype="float32")/n
+    goal_sma = np.convolve(goal, v, mode='valid')
+    epi = np.arange(episodes - n + 1)
+    plt.xlim(xmin=0, xmax=param6)
+    plt.ylim(ymin=0, ymax=0.5)
+    plt.grid()
+    plt.plot(epi, goal_sma)
+    #plt.legend()
+    dir_name = "/home/shohei/ドキュメント/DQN_obstacle_Data/" ###保存場所の指定###
+    filename = "{directory}{param}_test.png".format(directory=dir_name,param=param_name)
+    plt.savefig(filename)
+    ###
+    csvname = "{directory}{param}_test.csv".format(directory=dir_name,param=param_name)
+    csv = np.c_[np.arange(param6),goal]
+    np.savetxt(csvname,csv,delimiter=',')                
+        #print('episode {} score: {}'.format(episode, reward_sum))
        
     
           

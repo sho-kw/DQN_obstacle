@@ -2,11 +2,13 @@ from subprocess import run
 
 #param1 = int(sys.argv[1])#hidden1
 #param2 = int(sys.argv[2])#hidden2
-#param3 = int(sys.argv[3])#num_action
+#param3 = int(sys.argv[3])#batch_size
 
 #param4 = int(sys.argv[4])#broken_sensor
     #if param4 == 1:
-    #    broken_sensor
+    #    前方3つ故障
+    #elif param4 ==2:
+    #    ノイズ0.9〜1.1
     #else:
     #    no_broken_sensor
 
@@ -23,8 +25,8 @@ from subprocess import run
 
 
 
-samples = [(256,128,5,1,50000,5000,5,1,'sample1'),
-            (512,256,5,1,50000,5000,5,1,'sample2')]
+samples = [(128,128,32,0,50000,5000,5,1,'128128test'),
+           (128,128,32,0,50000,5000,5,1,'128128test2') ]
 
 
 for sample in samples:
